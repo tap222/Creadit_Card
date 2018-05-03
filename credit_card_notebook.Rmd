@@ -1,0 +1,176 @@
+---
+title: "Credit Card Data Analysis"
+output:
+  word_document: default
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+###Load library
+```{r}
+#Factor Analysis
+require(psych)
+require(GPArotation)
+```
+
+###Setting of working Directory and Read Data
+```{r}
+setwd("C:\\Users\\user\\Desktop\\Credit_card")
+cc <- read.csv('CC GENERAL.csv',header = TRUE)
+```
+
+###Exploration of Data Tables
+```{r}
+dim(cc)
+str(cc) 
+names(cc)
+```
+
+###Data Wrangling
+```{r}
+cc <- cc[-1] #deleting first column
+###It is ID which do not carry any information and it bring noise
+```
+
+```{r}
+cc_func <- function(x){
+  nmiss = sum(is.na(x)) #to check total number tof missing values
+  a = x[!is.na(x)] #to remove the NA values from dataset
+  n = length(a) #length
+  m = mean(a) #mean
+  min = min(a) #minimum
+  max = max(a) #maximum
+  s = sd(a) #Standard Deviation
+  p1 = quantile(a, 0.95) #Quantile of 95 confidence interval
+  p2 = quantile(a, 0.99) #Quantile of 99 confidence interval
+  UL = m+3*s #Upper Limit
+  LL = m-3*s #Lower Limit
+  return(c(n=n, nmiss=nmiss, Mean=m, Min=min, Max=max, StDev=s, P1=p1, P2=p2, 'Upper Limit'=UL, 'Lower Limit'=LL))
+}
+```
+
+
+```{r}
+vars <- c("BALANCE","BALANCE_FREQUENCY","PURCHASES","ONEOFF_PURCHASES","INSTALLMENTS_PURCHASES",          
+          "CASH_ADVANCE","PURCHASES_FREQUENCY","ONEOFF_PURCHASES_FREQUENCY","PURCHASES_INSTALLMENTS_FREQUENCY",
+          "CASH_ADVANCE_FREQUENCY","CASH_ADVANCE_TRX","PURCHASES_TRX","CREDIT_LIMIT","PAYMENTS",
+          "MINIMUM_PAYMENTS","PRC_FULL_PAYMENT","TENURE") #variable name
+
+```
+
+###Descriptive Statistics
+```{r}
+describe_stats <- t(data.frame(apply(cc[vars],2,cc_func)))
+#Apply Function where {cc[vars]} is variable names,{2} is column to apply, if {1} then apply for row and {cc_func} is function to apply
+describe_stats
+```
+
+
+###Data Exploration Plot
+```{r}
+plotdata<- cc
+par(mfrow=c(1,5))
+for (i in 1:length(plotdata)) {
+        boxplot(plotdata[,i], main=names(plotdata[i]), type="l")
+
+}
+```
+
+###outliers treatment
+```{r}
+cc$BALANCE[cc$BALANCE > 7809.060] <- 7809.060
+cc$PURCHASES[cc$PURCHASES > 7413.090] <- 7413.090
+cc$ONEOFF_PURCHASES[cc$ONEOFF_PURCHASES > 5572.107] <- 5572.107
+cc$INSTALLMENTS_PURCHASES[cc$INSTALLMENTS_PURCHASES > 3124.082] <- 3124.082
+cc$CASH_ADVANCE[cc$CASH_ADVANCE > 7270.351] <- 7270.351
+cc$CASH_ADVANCE_FREQUENCY[cc$CASH_ADVANCE_FREQUENCY > 0.736] <- 0.736
+cc$CASH_ADVANCE_TRX[cc$CASH_ADVANCE_TRX > 23.723] <- 23.723
+cc$PURCHASES_TRX[cc$PURCHASES_TRX > 89.283] <- 89.283
+cc$CREDIT_LIMIT[cc$CREDIT_LIMIT > 15410.910] <- 15410.910
+cc$PAYMENTS[cc$PAYMENTS > 10418.320] <- 10418.320
+cc$MINIMUM_PAYMENTS[cc$MINIMUM_PAYMENTS > 7981.557] <- 7981.557
+#Eliminating outlier with mean value/median value
+```
+
+###Missing value treatment
+```{r}
+cc$CREDIT_LIMIT[is.na(cc$CREDIT_LIMIT)] <- 4494.4
+cc$MINIMUM_PAYMENTS[is.na(cc$MINIMUM_PAYMENTS)] <- 864.20
+inputdata <- cc[vars] 
+#Omitting missing values with median/mean/mode
+```
+
+###correlation of data
+```{r}
+corr_cc <- cor(inputdata)
+corr_cc
+```
+
+###Correlation Plot
+```{r}
+library(corrplot)
+corPlot(corr_cc,numbers=TRUE)
+```
+
+###Factor Analysis
+```{r}
+FA <- fa(r = corr_cc, 5, rotate = "varimax", fm = "ml")
+FA
+```
+
+###Eigen Vectors
+```{r}
+eigen_value <- eigen(corr_cc)$values
+eigen_value
+```
+
+###Sorting the factors using factor analysis
+```{r}
+FA_Sorted <- fa.sort(FA)
+ls(FA_Sorted)
+loading <- FA_Sorted$loadings
+loading
+```
+
+###Variable names
+```{r}
+vars1 <- c("BALANCE","BALANCE_FREQUENCY","PURCHASES","ONEOFF_PURCHASES","PURCHASES_FREQUENCY",
+           "PURCHASES_INSTALLMENTS_FREQUENCY","CASH_ADVANCE_TRX","MINIMUM_PAYMENTS")
+inputdata1 <- cc[vars1]
+head(inputdata1)
+```
+
+###Scaling of Data
+```{r}
+inputdata_final <- scale(inputdata1) #Scaling data ((x-mu)/sd)
+head(inputdata_final)
+```
+
+###Applying k-means clustering
+```{r}
+Clus_3 <- kmeans(inputdata_final,3)
+Clus_4 <- kmeans(inputdata_final,4)
+Clus_5 <- kmeans(inputdata_final,5)
+Clus_6 <- kmeans(inputdata_final,6)
+```
+
+###Table of clustering
+```{r}
+table(Clus_3$cluster)
+table(Clus_4$cluster)
+table(Clus_5$cluster)
+table(Clus_6$cluster)
+```
+
+###Final Clustering Table of different value of 'k'
+```{r}
+cc_new <- cbind(cc, Km_Clus_3 = Clus_3$cluster, Km_Clus_4 = Clus_4$cluster, Km_Clus_5 = Clus_5$cluster, Km_Clus_6 = Clus_6$cluster)
+cc_new$Km_Clus_3 <- factor(cc_new$Km_Clus_3)
+cc_new$Km_Clus_4 <- factor(cc_new$Km_Clus_4)
+cc_new$Km_Clus_5 <- factor(cc_new$Km_Clus_5)
+cc_new$Km_Clus_6 <- factor(cc_new$Km_Clus_6)
+
+head(cc_new)
+
+```
+
